@@ -7,12 +7,20 @@ import Button from "../components/common/Button.jsx";
 import { useToast } from "../hooks/useToast";
 import { bookingsAPI } from "../api/bookings";
 
-const STATUS_FILTERS = ["All", "Requested", "Approved", "Returned", "Rejected"];
+const STATUS_FILTERS = [
+  "All",
+  "Requested",
+  "Approved",
+  "Return Pending",
+  "Returned",
+  "Rejected",
+];
 
 function badgeVariant(status) {
   const s = status?.toLowerCase();
   if (s === "approved") return "success";
   if (s === "requested") return "warning";
+  if (s === "return_pending" || s === "return pending") return "warning";
   if (s === "returned") return "default";
   if (s === "rejected") return "error";
   return "default";
@@ -30,16 +38,25 @@ export default function MyBookings() {
       .getMyBookings()
       .then((res) => {
         // Map backend response to frontend format
-        const mapped = (res.data || []).map((b) => ({
-          id: b.booking_id,
-          displayId: `BOOK-${String(b.booking_id).padStart(3, "0")}`,
-          component: b.component_name || `Component #${b.components_id}`,
-          qty: b.quantity,
-          requested: b.requested_date?.split("T")[0],
-          expected: b.expected_return_date?.split("T")[0],
-          status: b.status?.charAt(0).toUpperCase() + b.status?.slice(1),
-          isOverdue: b.is_overdue,
-        }));
+        const mapped = (res.data || []).map((b) => {
+          let displayStatus = b.status;
+          if (b.status === "return_pending") {
+            displayStatus = "Return Pending";
+          } else {
+            displayStatus =
+              b.status?.charAt(0).toUpperCase() + b.status?.slice(1);
+          }
+          return {
+            id: b.booking_id,
+            displayId: `BOOK-${String(b.booking_id).padStart(3, "0")}`,
+            component: b.component_name || `Component #${b.components_id}`,
+            qty: b.quantity,
+            requested: b.requested_date?.split("T")[0],
+            expected: b.expected_return_date?.split("T")[0],
+            status: displayStatus,
+            isOverdue: b.is_overdue,
+          };
+        });
         setBookings(mapped);
         setLoading(false);
       })
@@ -60,18 +77,19 @@ export default function MyBookings() {
     bookingsAPI
       .returnBooking(bookingId)
       .then(() => {
-        // Update local state
+        // Update local state to Return Pending (awaiting admin approval)
         setBookings((prev) =>
           prev.map((b) =>
-            b.id === bookingId ? { ...b, status: "Returned" } : b,
+            b.id === bookingId ? { ...b, status: "Return Pending" } : b,
           ),
         );
-        toast.success("Booking marked as returned!");
+        toast.success("Return request submitted! Awaiting admin approval.");
       })
       .catch((err) => {
-        console.error("Failed to return booking:", err);
+        console.error("Failed to submit return request:", err);
         toast.error(
-          "Failed to return booking. " + (err.response?.data?.message || ""),
+          "Failed to submit return request. " +
+            (err.response?.data?.message || ""),
         );
       });
   };

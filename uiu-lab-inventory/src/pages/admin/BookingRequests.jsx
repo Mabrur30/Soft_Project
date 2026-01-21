@@ -11,6 +11,7 @@ export default function BookingRequests() {
   const [counts, setCounts] = useState({
     requested: 0,
     approved: 0,
+    return_pending: 0,
     rejected: 0,
   });
   const [requests, setRequests] = useState([]);
@@ -21,6 +22,10 @@ export default function BookingRequests() {
   const [rejectModal, setRejectModal] = useState({
     open: false,
     bookingId: null,
+  });
+  const [viewModal, setViewModal] = useState({
+    open: false,
+    booking: null,
   });
   const [rejectReason, setRejectReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
@@ -51,15 +56,18 @@ export default function BookingRequests() {
       setRequests(formattedRequests);
 
       // Get counts for each status
-      const [requestedRes, approvedRes, rejectedRes] = await Promise.all([
-        adminAPI.getAllBookings({ status: "requested" }),
-        adminAPI.getAllBookings({ status: "approved" }),
-        adminAPI.getAllBookings({ status: "rejected" }),
-      ]);
+      const [requestedRes, approvedRes, returnPendingRes, rejectedRes] =
+        await Promise.all([
+          adminAPI.getAllBookings({ status: "requested" }),
+          adminAPI.getAllBookings({ status: "approved" }),
+          adminAPI.getAllBookings({ status: "return_pending" }),
+          adminAPI.getAllBookings({ status: "rejected" }),
+        ]);
 
       setCounts({
         requested: (requestedRes.data || []).length,
         approved: (approvedRes.data || []).length,
+        return_pending: (returnPendingRes.data || []).length,
         rejected: (rejectedRes.data || []).length,
       });
 
@@ -99,6 +107,20 @@ export default function BookingRequests() {
     }
   };
 
+  const handleApproveReturn = async (id) => {
+    try {
+      setActionLoading(true);
+      await adminAPI.approveReturn(id);
+      toast.success("Return approved! Component quantity restored.");
+      loadBookings();
+    } catch (err) {
+      console.error("Failed to approve return:", err);
+      toast.error("Failed to approve return");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const openRejectModal = (id) => {
     setRejectModal({ open: true, bookingId: id });
     setRejectReason("");
@@ -107,6 +129,14 @@ export default function BookingRequests() {
   const closeRejectModal = () => {
     setRejectModal({ open: false, bookingId: null });
     setRejectReason("");
+  };
+
+  const openViewModal = (booking) => {
+    setViewModal({ open: true, booking });
+  };
+
+  const closeViewModal = () => {
+    setViewModal({ open: false, booking: null });
   };
 
   const handleReject = async () => {
@@ -141,6 +171,10 @@ export default function BookingRequests() {
             {[
               { key: "requested", label: `Pending (${counts.requested})` },
               { key: "approved", label: `Approved (${counts.approved})` },
+              {
+                key: "return_pending",
+                label: `Return Pending (${counts.return_pending})`,
+              },
               { key: "rejected", label: `Rejected (${counts.rejected})` },
               { key: "all", label: "All" },
             ].map((tab) => (
@@ -213,10 +247,16 @@ export default function BookingRequests() {
                           ? "warning"
                           : req.status === "approved"
                             ? "success"
-                            : "error"
+                            : req.status === "return_pending"
+                              ? "warning"
+                              : req.status === "returned"
+                                ? "default"
+                                : "error"
                       }
                     >
-                      {req.status}
+                      {req.status === "return_pending"
+                        ? "Return Pending"
+                        : req.status}
                     </Badge>
                   </td>
                   <td className="py-3 px-3 space-x-1 flex">
@@ -238,7 +278,19 @@ export default function BookingRequests() {
                         </button>
                       </>
                     )}
-                    <button className="px-3 py-1 border border-slate-300 text-slate-700 text-xs rounded font-semibold hover:bg-slate-50">
+                    {req.status === "return_pending" && (
+                      <button
+                        onClick={() => handleApproveReturn(req.id)}
+                        disabled={actionLoading}
+                        className="px-3 py-1 bg-blue-500 text-white text-xs rounded font-semibold hover:bg-blue-600 disabled:opacity-50"
+                      >
+                        Approve Return
+                      </button>
+                    )}
+                    <button
+                      onClick={() => openViewModal(req)}
+                      className="px-3 py-1 border border-slate-300 text-slate-700 text-xs rounded font-semibold hover:bg-slate-50"
+                    >
                       Details
                     </button>
                   </td>
@@ -298,6 +350,126 @@ export default function BookingRequests() {
                 className="px-4 py-2 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {actionLoading ? "Rejecting..." : "Reject Booking"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Details Modal */}
+      {viewModal.open && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Booking Details
+              </h3>
+              <button
+                onClick={closeViewModal}
+                className="text-slate-400 hover:text-slate-600 text-xl leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">
+                    Request ID
+                  </p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    #{viewModal.booking?.id}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">
+                    Status
+                  </p>
+                  <Badge
+                    variant={
+                      viewModal.booking?.status === "approved"
+                        ? "success"
+                        : viewModal.booking?.status === "rejected"
+                          ? "error"
+                          : viewModal.booking?.status === "return_pending"
+                            ? "warning"
+                            : viewModal.booking?.status === "requested"
+                              ? "warning"
+                              : "default"
+                    }
+                  >
+                    {viewModal.booking?.status === "return_pending"
+                      ? "Return Pending"
+                      : viewModal.booking?.status}
+                  </Badge>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">
+                    Student
+                  </p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {viewModal.booking?.student}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {viewModal.booking?.studentId}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">
+                    Component
+                  </p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {viewModal.booking?.component}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">
+                    Quantity
+                  </p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {viewModal.booking?.qty}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">
+                    Purpose
+                  </p>
+                  <p className="text-sm text-slate-700">
+                    {viewModal.booking?.purpose}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">
+                    Requested Date
+                  </p>
+                  <p className="text-sm text-slate-700">
+                    {viewModal.booking?.requested}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">
+                    Expected Return
+                  </p>
+                  <p className="text-sm text-slate-700">
+                    {viewModal.booking?.expectedReturn}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 px-5 py-4 bg-slate-50 border-t border-slate-200">
+              <button
+                onClick={closeViewModal}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+              >
+                Close
               </button>
             </div>
           </div>

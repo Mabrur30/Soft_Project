@@ -36,6 +36,13 @@ router.patch("/:bookingId/reject", auth, bookingController.rejectBooking);
 // PATCH - Return booking
 router.patch("/:bookingId/return", auth, bookingController.returnBooking);
 
+// PATCH - Approve return (Admin only)
+router.patch(
+  "/:bookingId/approve-return",
+  auth,
+  bookingController.approveReturn,
+);
+
 // PATCH - Mark booking as overdue (Admin only)
 router.patch("/:bookingId/overdue", auth, bookingController.markOverdue);
 

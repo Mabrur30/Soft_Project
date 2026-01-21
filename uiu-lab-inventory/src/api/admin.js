@@ -23,6 +23,8 @@ export const adminAPI = {
   approveBooking: (bookingId) => api.patch(`/bookings/${bookingId}/approve`),
   rejectBooking: (bookingId, reason) =>
     api.patch(`/bookings/${bookingId}/reject`, { reason }),
+  approveReturn: (bookingId) =>
+    api.patch(`/bookings/${bookingId}/approve-return`),
   returnBooking: (bookingId) => api.patch(`/bookings/${bookingId}/return`),
   markOverdue: (bookingId) => api.patch(`/bookings/${bookingId}/overdue`),
   deleteBooking: (bookingId) => api.delete(`/bookings/${bookingId}`),

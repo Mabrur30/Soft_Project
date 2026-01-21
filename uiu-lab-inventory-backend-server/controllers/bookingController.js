@@ -253,7 +253,7 @@ exports.rejectBooking = (req, res) => {
   );
 };
 
-// Return booking (Mark as returned)
+// Return booking (Student requests return - sets to return_pending)
 exports.returnBooking = (req, res) => {
   const { bookingId } = req.params;
 
@@ -267,7 +267,7 @@ exports.returnBooking = (req, res) => {
 
     const booking = results[0];
 
-    // Only admin or the booking owner can mark as returned
+    // Only admin or the booking owner can request return
     if (req.user.role !== "admin" && req.user.userId !== booking.user_id) {
       return res.status(403).json({ message: "Forbidden: Access denied" });
     }
@@ -278,8 +278,49 @@ exports.returnBooking = (req, res) => {
         .json({ message: "Booking is not in approved status" });
     }
 
-    // Update booking status
+    // Update booking status to return_pending (awaiting admin approval)
     const updateQuery = "UPDATE booking SET status = ? WHERE booking_id = ?";
+
+    db.query(updateQuery, ["return_pending", bookingId], (updateErr) => {
+      if (updateErr) return res.status(500).json({ error: updateErr.message });
+
+      // Do NOT restore quantity yet - wait for admin approval
+      res.json({
+        message: "Return request submitted. Awaiting admin approval.",
+      });
+    });
+  });
+};
+
+// Approve return (Admin only - marks as returned and restores quantity)
+exports.approveReturn = (req, res) => {
+  if (req.user.role !== "admin") {
+    return res
+      .status(403)
+      .json({ message: "Forbidden: Admin access required" });
+  }
+
+  const { bookingId } = req.params;
+
+  // First get the booking
+  const getQuery = "SELECT * FROM booking WHERE booking_id = ?";
+
+  db.query(getQuery, [bookingId], (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (results.length === 0)
+      return res.status(404).json({ message: "Booking not found" });
+
+    const booking = results[0];
+
+    if (booking.status !== "return_pending") {
+      return res
+        .status(400)
+        .json({ message: "Booking is not in return pending status" });
+    }
+
+    // Update booking status to returned
+    const updateQuery =
+      "UPDATE booking SET status = ?, actual_return_date = NOW() WHERE booking_id = ?";
 
     db.query(updateQuery, ["returned", bookingId], (updateErr) => {
       if (updateErr) return res.status(500).json({ error: updateErr.message });
@@ -297,7 +338,7 @@ exports.returnBooking = (req, res) => {
         },
       );
 
-      res.json({ message: "Booking marked as returned successfully" });
+      res.json({ message: "Return approved. Component quantity restored." });
     });
   });
 };

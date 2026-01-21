@@ -35,7 +35,7 @@ export default function StockManagement() {
 
         return {
           id: c.components_id,
-          component: c.name,
+          component: c.component_name,
           current: c.total_quantity,
           available: c.available_quantity,
           inUse: inUse,

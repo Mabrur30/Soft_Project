@@ -21,6 +21,10 @@ export default function AdminDashboard() {
     open: false,
     bookingId: null,
   });
+  const [viewModal, setViewModal] = useState({
+    open: false,
+    booking: null,
+  });
   const [rejectReason, setRejectReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -137,6 +141,14 @@ export default function AdminDashboard() {
   const closeRejectModal = () => {
     setRejectModal({ open: false, bookingId: null });
     setRejectReason("");
+  };
+
+  const openViewModal = (booking) => {
+    setViewModal({ open: true, booking });
+  };
+
+  const closeViewModal = () => {
+    setViewModal({ open: false, booking: null });
   };
 
   const handleReject = async () => {
@@ -294,7 +306,10 @@ export default function AdminDashboard() {
                           </button>
                         </>
                       ) : (
-                        <button className="px-2 py-1 border border-slate-300 text-slate-700 text-xs rounded font-semibold">
+                        <button
+                          onClick={() => openViewModal(b)}
+                          className="px-2 py-1 border border-slate-300 text-slate-700 text-xs rounded font-semibold hover:bg-slate-50"
+                        >
                           View
                         </button>
                       )}
@@ -389,6 +404,95 @@ export default function AdminDashboard() {
           className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
           autoFocus
         />
+      </Modal>
+
+      {/* View Details Modal */}
+      <Modal
+        open={viewModal.open}
+        onClose={closeViewModal}
+        title="Booking Details"
+        footer={
+          <button
+            onClick={closeViewModal}
+            className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+          >
+            Close
+          </button>
+        }
+      >
+        {viewModal.booking && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">
+                  Booking ID
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  #{viewModal.booking.id}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">
+                  Status
+                </p>
+                <Badge
+                  variant={
+                    viewModal.booking.status === "approved"
+                      ? "success"
+                      : viewModal.booking.status === "rejected"
+                        ? "error"
+                        : viewModal.booking.status === "return_pending"
+                          ? "warning"
+                          : "default"
+                  }
+                >
+                  {viewModal.booking.status === "return_pending"
+                    ? "Return Pending"
+                    : viewModal.booking.status}
+                </Badge>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">
+                  Student
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {viewModal.booking.student}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {viewModal.booking.studentId}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">
+                  Component
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {viewModal.booking.component}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">
+                  Quantity
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {viewModal.booking.qty}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">
+                  Purpose
+                </p>
+                <p className="text-sm text-slate-700">
+                  {viewModal.booking.purpose}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </AdminLayout>
   );
