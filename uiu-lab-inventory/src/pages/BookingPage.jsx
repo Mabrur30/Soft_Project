@@ -31,10 +31,11 @@ export default function BookingPage() {
           name: c.component_name,
           code: c.component_code,
           available: c.available_quantity,
-          hasImage: c.images !== null,
-          image: c.images
-            ? `http://localhost:3000/api/components/${c.components_id}/image`
-            : `https://placehold.co/400x300?text=${encodeURIComponent(c.component_name)}`,
+          hasImage: c.images && c.images.length > 0,
+          image:
+            c.images && c.images.length > 0
+              ? `http://localhost:3000/api/components/${c.components_id}/image`
+              : `https://placehold.co/400x300?text=${encodeURIComponent(c.component_name)}`,
         }));
         setComponents(mapped);
         setLoading(false);
@@ -94,10 +95,11 @@ export default function BookingPage() {
             available: c.available_quantity,
             category: c.category,
             description: c.description,
-            hasImage: c.images !== null,
-            image: c.images
-              ? `http://localhost:3000/api/components/${c.components_id}/image`
-              : `https://placehold.co/400x300?text=${encodeURIComponent(c.component_name)}`,
+            hasImage: c.images && c.images.length > 0,
+            image:
+              c.images && c.images.length > 0
+                ? `http://localhost:3000/api/components/${c.components_id}/image`
+                : `https://placehold.co/400x300?text=${encodeURIComponent(c.component_name)}`,
           }));
           setComponents(mapped);
         });
@@ -156,11 +158,11 @@ export default function BookingPage() {
                     }`}
                   >
                     {/* image */}
-                    <div className="aspect-[4/3] bg-slate-100">
+                    <div className="aspect-[4/3] bg-slate-100 flex items-center justify-center">
                       <img
                         src={c.image}
                         alt={c.name}
-                        className="w-full h-full object-cover"
+                        className="max-w-full max-h-full object-contain"
                       />
                     </div>
 

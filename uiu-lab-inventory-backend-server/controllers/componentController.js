@@ -1,6 +1,13 @@
 const db = require("../models/db"); // Your DB connection
+const path = require("path");
+const fs = require("fs");
 
 exports.createComponent = (req, res) => {
+  console.log("=== createComponent called ===");
+  console.log("req.body:", req.body);
+  console.log("req.file:", req.file ? req.file.filename : "No file");
+  console.log("req.user:", req.user);
+
   if (req.user.role !== "admin") {
     return res
       .status(403)
@@ -19,8 +26,18 @@ exports.createComponent = (req, res) => {
     under_maintenance_quantity,
   } = req.body;
 
-  // Get image buffer if uploaded (for BLOB storage)
-  const imageBuffer = req.file ? req.file.buffer : null;
+  // Get image path if uploaded (store as file path string)
+  const imagePath = req.file ? req.file.filename : "";
+
+  console.log("Inserting component:", {
+    component_name,
+    component_code,
+    category,
+    description,
+    imagePath,
+    total_quantity,
+    available_quantity,
+  });
 
   const query =
     "INSERT INTO components (component_name, component_code, category, description, images, status, total_quantity, available_quantity, damaged_quantity, under_maintenance_quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -31,8 +48,8 @@ exports.createComponent = (req, res) => {
       component_name,
       component_code,
       category,
-      description,
-      imageBuffer,
+      description || null,
+      imagePath,
       status || "active",
       total_quantity || 0,
       available_quantity || 0,
@@ -41,6 +58,7 @@ exports.createComponent = (req, res) => {
     ],
     (err, results) => {
       if (err) {
+        console.error("Database error:", err);
         if (err.code === "ER_DUP_ENTRY") {
           return res
             .status(400)
@@ -69,9 +87,19 @@ exports.getComponentImage = (req, res) => {
       return res.status(404).json({ message: "Image not found" });
     }
 
-    // Send the image as binary data
-    res.set("Content-Type", "image/jpeg");
-    res.send(results[0].images);
+    // Serve the image file from uploads/components folder
+    const imagePath = path.join(
+      __dirname,
+      "../uploads/components",
+      results[0].images,
+    );
+
+    // Check if file exists
+    if (!fs.existsSync(imagePath)) {
+      return res.status(404).json({ message: "Image file not found" });
+    }
+
+    res.sendFile(imagePath);
   });
 };
 
@@ -176,12 +204,33 @@ exports.updateComponent = (req, res) => {
     under_maintenance_quantity,
   } = req.body;
 
-  const query =
-    "UPDATE components SET component_name = ?, component_code = ?, category = ?, description = ?, status = ?, total_quantity = ?, available_quantity = ?, damaged_quantity = ?, under_maintenance_quantity = ? WHERE components_id = ?";
+  // Get image path if uploaded
+  const imagePath = req.file ? req.file.filename : null;
 
-  db.query(
-    query,
-    [
+  // Build query dynamically based on whether image is uploaded
+  let query;
+  let params;
+
+  if (imagePath) {
+    query =
+      "UPDATE components SET component_name = ?, component_code = ?, category = ?, description = ?, status = ?, total_quantity = ?, available_quantity = ?, damaged_quantity = ?, under_maintenance_quantity = ?, images = ? WHERE components_id = ?";
+    params = [
+      component_name,
+      component_code,
+      category,
+      description,
+      status,
+      total_quantity,
+      available_quantity,
+      damaged_quantity,
+      under_maintenance_quantity,
+      imagePath,
+      id,
+    ];
+  } else {
+    query =
+      "UPDATE components SET component_name = ?, component_code = ?, category = ?, description = ?, status = ?, total_quantity = ?, available_quantity = ?, damaged_quantity = ?, under_maintenance_quantity = ? WHERE components_id = ?";
+    params = [
       component_name,
       component_code,
       category,
@@ -192,22 +241,23 @@ exports.updateComponent = (req, res) => {
       damaged_quantity,
       under_maintenance_quantity,
       id,
-    ],
-    (err, results) => {
-      if (err) {
-        if (err.code === "ER_DUP_ENTRY") {
-          return res
-            .status(400)
-            .json({ message: "Component code already exists" });
-        }
-        return res.status(500).json({ error: err.message });
+    ];
+  }
+
+  db.query(query, params, (err, results) => {
+    if (err) {
+      if (err.code === "ER_DUP_ENTRY") {
+        return res
+          .status(400)
+          .json({ message: "Component code already exists" });
       }
-      if (results.affectedRows === 0) {
-        return res.status(404).json({ message: "Component not found" });
-      }
-      res.json({ message: "Component updated successfully" });
-    },
-  );
+      return res.status(500).json({ error: err.message });
+    }
+    if (results.affectedRows === 0) {
+      return res.status(404).json({ message: "Component not found" });
+    }
+    res.json({ message: "Component updated successfully" });
+  });
 };
 
 exports.updateComponentPartial = (req, res) => {
@@ -330,11 +380,9 @@ exports.deleteComponent = (req, res) => {
       }
 
       if (waitlistResults && waitlistResults[0]?.count > 0) {
-        return res
-          .status(400)
-          .json({
-            message: "Cannot delete component with active waitlist entries",
-          });
+        return res.status(400).json({
+          message: "Cannot delete component with active waitlist entries",
+        });
       }
 
       const query = "DELETE FROM components WHERE components_id = ?";

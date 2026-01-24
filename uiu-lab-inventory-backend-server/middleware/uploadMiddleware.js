@@ -1,8 +1,25 @@
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 
-// Use memory storage for BLOB database storage
-const storage = multer.memoryStorage();
+// Ensure uploads directory exists
+const uploadDir = path.join(__dirname, "../uploads/components");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Use disk storage to save files to uploads/components folder
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename: timestamp-randomstring.extension
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `component-${uniqueSuffix}${ext}`);
+  },
+});
 
 // File filter - only allow images
 const fileFilter = (req, file, cb) => {

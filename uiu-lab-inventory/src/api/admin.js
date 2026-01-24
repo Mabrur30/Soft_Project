@@ -34,9 +34,14 @@ export const adminAPI = {
   getComponentById: (id) => api.get(`/components/${id}`),
   getComponentByCode: (code) => api.get(`/components/code/${code}`),
   getCategories: () => api.get("/components/categories"),
-  addComponent: (payload) => api.post("/components", payload),
+  addComponent: (payload) =>
+    api.post("/components", payload, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
   updateComponent: (componentId, payload) =>
-    api.put(`/components/${componentId}`, payload),
+    api.put(`/components/${componentId}`, payload, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
   updateComponentPartial: (componentId, payload) =>
     api.patch(`/components/${componentId}`, payload),
   deleteComponent: (componentId) => api.delete(`/components/${componentId}`),
